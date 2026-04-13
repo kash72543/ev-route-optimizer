@@ -294,12 +294,14 @@ def get_osrm_route(waypoints):
     return None
 
 
-def estimate_charge_minutes(range_km, power_kw):
+def estimate_charge_minutes(range_km, power_kw, vehicle_key):
     """
     Estimate time (minutes) to charge from ~15 % to ~85 % (usable 70 % SoC).
     Assumes ~180 Wh/km consumption to estimate battery capacity.
     """
-    battery_kwh = range_km * 0.18
+
+    vehicle = get_vehicle_profile(vehicle_key)
+    battery_kwh = range_km * vehicle["efficiency_kwh_per_km"]
     charge_kwh = battery_kwh * 0.70
     return round(charge_kwh / power_kw * 60)
 
@@ -316,7 +318,7 @@ def estimate_energy(distance_km, vehicle_key):
 
 # ─── Core Routing Algorithm ──────────────────────────────────────────────────
 
-def calculate_charging_stops(start, end, range_km):
+def calculate_charging_stops(start, end, range_km, vehicle_key):
     """
     Greedy Maximum-Advance with Detour Penalty algorithm.
 
@@ -374,7 +376,7 @@ def calculate_charging_stops(start, end, range_km):
                 "progress_km":     round(progress, 1),
                 "detour_km":       round(penalty, 1),
                 "score":           score,
-                "charge_mins":     estimate_charge_minutes(range_km, s["power_kw"]),
+                "charge_mins":     estimate_charge_minutes(range_km, s["power_kw"], vehicle_key),
             })
 
         if not candidates:
@@ -456,7 +458,7 @@ def plan_route():
     direct_km = haversine(*start_coords, *end_coords)
 
     # ── Charging stop optimisation ───────────────────────────────────────────
-    stops, err = calculate_charging_stops(start_coords, end_coords, range_km)
+    stops, err = calculate_charging_stops(start_coords, end_coords, range_km, vehicle_key)
     if err:
         return jsonify({"error": err}), 400
 
